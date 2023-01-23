@@ -1,0 +1,199 @@
+
+```{r setup, include=FALSE}
+library('ggplot2');
+library('dplyr');
+library('car');
+library('caret');
+library('pROC');
+library('reshape2');
+knitr::opts_chunk$set(eval=T, echo=T)
+```
+
+```{r}
+data <- read.csv("GamingStudy_data.csv", sep=",",na.strings = "NA")
+data$Platform <- as.factor(data$Platform)
+levels(data$Platform) <- c("Console", "PC", "Smartphone / Tablet")
+data$whyplay <- as.factor(data$whyplay)
+data <- data %>% mutate(whyplay_norm = case_when(
+  whyplay == "having fun" ~ "Having fun",
+  whyplay == "improving " ~ "Improving ",
+  whyplay == "winning" ~ "Winning",
+  whyplay == "relaxing" ~ "Relaxing",
+  whyplay == "All of the above" ~ "All",
+  whyplay == "all of the above" ~ "All",
+  TRUE ~ "Other"
+))
+```
+
+```{r}
+data$Playstyle <- as.factor(data$Playstyle)
+data <- data %>% mutate(Playstyle_norm = case_when(
+  Playstyle == "Multiplayer - offline (people in the same room)" ~ "Local multiplayer",
+  Playstyle == "Singleplayer" ~ "Singleplayer",
+  Playstyle == "Multiplayer - online - with online acquaintances or teammates" ~ "Online with acquaintances",
+  Playstyle == "Multiplayer - online - with strangers" ~ "Online with strangers",
+  Playstyle == "Multiplayer - online - with real life friends " ~ "Online with friends",
+  Playstyle == "All of the above" ~ "All",
+  Playstyle == "all of the above" ~ "All",
+  TRUE ~ "Other"
+))
+```
+
+
+density_data
+
+```{r}
+density_data <- data[,c("Birthplace", "Birthplace_ISO3")] %>%
+  group_by(Birthplace, Birthplace_ISO3) %>%
+  summarise(n = n(), .groups='keep')
+```
+
+```{r}
+write.csv(density_data, "density_data.csv", row.names=FALSE)
+```
+
+most_popular_game_data
+
+```{r}
+most_popular_game_data <- data[,c("Birthplace", "Game")] %>%
+  group_by(Birthplace, Game) %>%
+  summarise(n = n(), .groups='keep') %>%
+  group_by(Birthplace) %>%
+  top_n(1, n)
+```
+
+```{r}
+write.csv(most_popular_game_data, "most_popular_game_data.csv", row.names=FALSE)
+```
+
+second_most_popular_game_data
+
+```{r}
+second_most_popular_game_data <- data[data$Game != "Other",c("Birthplace", "Game")] %>%
+  group_by(Birthplace, Game) %>%
+  summarise(n = n(), .groups='keep') %>%
+  group_by(Birthplace) %>%
+  top_n(2, n) %>%
+  top_n(-1, n)
+```
+
+```{r}
+write.csv(second_most_popular_game_data, "second_most_popular_game_data.csv", row.names=FALSE)
+```
+
+survey_data
+
+```{r}
+survey_data <- data[,c("Gender","Age","Platform","Birthplace","Game","Hours","whyplay_norm","Playstyle")]
+```
+
+```{r}
+write.csv(survey_data, "survey_data.csv", row.names=FALSE)
+```
+
+whyplay_data
+
+```{r}
+whyplay_data <- data[data$Gender != 'Other',c("Gender","whyplay_norm")] %>%
+  group_by(Gender, whyplay_norm) %>%
+  summarise(n = n(), .groups='keep') %>%
+  dcast(whyplay_norm ~ Gender)
+```
+
+```{r}
+write.csv(whyplay_data, "whyplay_data.csv", row.names=FALSE)
+```
+
+age_data
+
+```{r}
+age_data <- data[,c("Age","Gender")] %>% 
+  mutate(new_bin = cut(Age, breaks=c(17, 20, 30, 40, 50, 68))) %>%
+  group_by(Gender, new_bin) %>%
+  summarise(n = n(), .groups='keep') %>%
+  dcast(new_bin ~ Gender)
+```
+
+```{r}
+write.csv(age_data, "age_data.csv", row.names=FALSE)
+```
+
+tests_data
+
+```{r}
+tests_data <- data[,c("GAD_T","SWL_T","SPIN_T")]
+```
+
+```{r}
+write.csv(table(tests_data$GAD_T), "tests_data_gad.csv", row.names=FALSE)
+write.csv(table(tests_data$SWL_T), "tests_data_swl.csv", row.names=FALSE)
+write.csv(table(tests_data$SPIN_T), "tests_data_spin.csv", row.names=FALSE)
+```
+
+scatter_data
+
+```{r}
+scatter_data <- data[,c("Hours","GAD_T","SWL_T","SPIN_T")]
+```
+
+```{r}
+write.csv(scatter_data, "scatter_data.csv", row.names=FALSE)
+```
+
+playstyle_data
+
+```{r}
+playstyle_data <- data[,c("Playstyle_norm","GAD_T","SWL_T","SPIN_T")] %>%
+  group_by(Playstyle_norm) %>%
+  summarise(GAD_T_MEAN = mean(GAD_T), SWL_T_MEAN = mean(SWL_T), SPIN_T = mean(SPIN_T, na.rm=TRUE), .groups='keep')
+playstyle_data
+```
+
+```{r}
+write.csv(playstyle_data, "playstyle_data.csv", row.names=FALSE)
+```
+
+whyplay_mean_data
+
+```{r}
+whyplay_mean_data <- data[,c("whyplay_norm","GAD_T","SWL_T","SPIN_T")] %>%
+  group_by(whyplay_norm) %>%
+  summarise(GAD_T_MEAN = mean(GAD_T), SWL_T_MEAN = mean(SWL_T), SPIN_T = mean(SPIN_T, na.rm=TRUE), .groups='keep')
+whyplay_mean_data
+```
+
+```{r}
+write.csv(whyplay_mean_data, "whyplay_mean_data.csv", row.names=FALSE)
+```
+
+survey_data_with_tests
+
+```{r}
+survey_data_with_tests <- data[,c("Gender","Age","Platform","Birthplace","Game","Hours",
+                                  "whyplay_norm","Playstyle_norm","GAD_T","SWL_T","SPIN_T")]
+survey_data_with_tests <- survey_data_with_tests %>% mutate(Anxiety = case_when(
+  GAD_T >= 0 & GAD_T <= 4 ~ "No anxiety",
+  GAD_T >= 5 & GAD_T <= 9 ~ "Mild anxiety",
+  GAD_T >= 10 & GAD_T <= 14 ~ "Moderate anxiety",
+  GAD_T >= 15 ~ "Severe anxiety"
+))
+survey_data_with_tests <- survey_data_with_tests %>% mutate(Satisfaction = case_when(
+  SWL_T >= 0 & SWL_T <= 9 ~ "Extremely dissatisfied",
+  SWL_T >= 10 & SWL_T <= 14 ~ "Dissatisfied",
+  SWL_T >= 15 & SWL_T <= 19 ~ "Slightly dissatisfied",
+  SWL_T >= 20 & SWL_T <= 24 ~ "Slightly satisfied",
+  SWL_T >= 25 & SWL_T <= 29 ~ "Satisfied",
+  SWL_T >= 30 ~ "Extremely satisfied"
+))
+survey_data_with_tests <- survey_data_with_tests %>% mutate(SocialPhobia = case_when(
+  SPIN_T >= 0 & SPIN_T <= 20 ~ "No social phobia",
+  SPIN_T >= 21 & SPIN_T <= 30 ~ "Mild social phobia",
+  SPIN_T >= 31 & SPIN_T <= 40 ~ "Moderate social phobia",
+  SPIN_T >= 41 & SPIN_T <= 50 ~ "Severe social phobia",
+  SPIN_T >= 51 ~ "Extreme social phobia",
+))
+```
+
+```{r}
+write.csv(survey_data_with_tests, "survey_data_with_tests.csv", row.names=FALSE)
+```
